@@ -1,15 +1,24 @@
-def isContained(area1,area2):
-    ''''
-    area1, area2 = [xbottom_left, ybottom_left, xtop_right, ytop_right]
+def vectorToCoordinates(vector):
     '''
-    xa0,ya0,xa1,ya1 = area1
-    area1 = area2[0], area2[1], area2[0]+abs(xa0-xa1), area2[1]+abs(ya0-ya1)
+    vector:[x,y]
+    return: [0,0,x,y]
+    '''
+    return [0,0,vector[0],vector[1]]
 
-    return area1[0]>=area2[0] and area1[1]>=area2[1] and area1[2]<=area2[2] and area1[3]<=area2[3]
+def changeOrientation(coordinate):
+    '''
+    coordinates:[x0,y0,x1,y1]
+    return:[x0,y0,x0+(y1-y0),y0+(x1-x0)]
+    '''
+    x0,y0,x1,y1 = coordinate
+    aux = x1
+    x1 = x0 + abs(y1-y0)
+    y1 = y0 + abs(aux - x0)
+    return [x0,y0,x1,y1]
 
 def isIntersect(area1,area2):
     ''''
-    area1, area2 = [xbottom_left, ybottom_left, xtop_right, ytop_right]
+    area1, area2 = [x0,y0,x1,y1]
     '''
     xa0,ya0,xa1,ya1 = area1
     xa_top_left,ya_top_left = xa0, ya1
