@@ -1,4 +1,5 @@
-import utils
+import numpy as np
+from numpy.core.fromnumeric import shape
 from bin import Bin
 class Area:
     def __init__(self, coordinates):
@@ -37,6 +38,10 @@ class Area:
         else:
             self._polish_notation += " "+id+" " +horientation
             self._bin_horientation += aux.orientation()
+        
+        # print('agregado')
+        # print(aux.coordinate(), aux.id())
+        # print(self._polish_notation)
         return True
 
     def first_bin(self):
@@ -77,9 +82,15 @@ class Area:
         else:
             area1 = ('V',(self.x0, area[1], self.x1,self.y1))
             area2 = ('H',(area[2],self.y0, self.x1, area[1]))
-        if available_area==0:
-            area1 = None
+        
+        a1 = abs(area1[1][0]-area1[1][2])*abs(area1[1][1]-area1[1][3])
+        a2 = abs(area2[1][0]-area2[1][2])*abs(area2[1][1]-area2[1][3])
 
+        if a1 ==0:
+            area1 = None
+            
+        if a2 ==0:
+            area2 = None
         return area1,area2
 
     def polish_notation(self):
@@ -131,7 +142,12 @@ class Stack():
         self.top = -1
         # This array is used a stack
         self.array = []
-     
+    
+    def reset(self):
+        self.top = -1
+        # This array is used a stack
+        self.array = []
+
     # check if the stack is empty
     def isEmpty(self):
         return True if self.top == -1 else False
@@ -157,37 +173,78 @@ class Stack():
 
     # The main function that converts given infix expression
     # to postfix expression
-    def evaluatePostfix(self, exp):
-         
+    def evaluatePostfix(self, dictionary, exp):
+        bins_area = 0
+        width = 0
+        height = 0
         # Iterate over the expression for conversion
-        for i in exp:
-             
+        for i in exp.split(' '):
             # If the scanned character is an operand
             # (number here) push it to the stack
             if i.isdigit():
-                self.push(i)
+                val = Bin(dictionary[i],i)
+                self.push(val)
+                bins_area+=val.area()
+            # If the scanned character is an operator,
+            # pop two elements from stack and apply it.
+            else:
+                val1 = self.pop()
+                val2 = self.pop()
+                if i =='H':
+                    width = val1.width() + val2.width()
+                    height = max(val1.height(),val2.height())
+                elif i == 'V':
+                    width = max(val1.width(), val2.width())
+                    height = val1.height()+val2.height()
+                else:
+                    raise Exception('Invalid')
+                self.push(Bin([0,0,width,height],val1.id()+val2.id()+str(i)))
+        r = self.pop()
+        return r.area(), bins_area
+
+    def binsPositions(self, dictionary, exp):
+        width = 0
+        height = 0
+        points = []
+        # Iterate over the expression for conversion
+        for i in exp.split(' '):
+            # If the scanned character is an operand
+            # (number here) push it to the stack
+            if i.isdigit():
+                val = Bin(dictionary[i],i)
+                self.push(val)
  
             # If the scanned character is an operator,
             # pop two elements from stack and apply it.
             else:
                 val1 = self.pop()
                 val2 = self.pop()
-                self.push(str(eval(val2 + i + val1)))
- 
-        return int(self.pop())
+                if i =='H':
+                    width = val1.width() + val2.width()
+                    height = max(val1.height(),val2.height())
+                    
+                elif i == 'V':
+                    width = max(val1.width(), val2.width())
+                    height = val1.height()+val2.height()
+                else:
+                    raise Exception('Invalid')
+                id = val1.id()+val2.id()+str(i)
+                points.append(val1.coordinate())
+                self.push(Bin([0,0,width,height],id))
+        r = self.pop()
+        return points
 
 
 
-# x = Area(([0,0,10,10],'P'))
-
-# bins = [([0,0,4,2],'1'),([0,0,5,2],'1'),([0,0,1,3],'1'),([0,0,2,1],'1')]
+# x = Area(([0,0,10,10]))
+# bins = [([0,0,4,1],'1'),([0,0,3,2],'2'),([0,0,4,3],'3'),([0,0,2,2],'4'),([0,0,2,1],'5'),([0,0,6,1],'6'),([0,0,4,2],'7'),([0,0,2,6],'8')]
 
 # for b in bins:
-#     x.add_sub_area(b)
+#     x.add_bin(b[0],b[1])
 
-# for b in x._sub_area:
-#     print(b.coordinate())
+# for b in x.bins():
+#     print(b)
 
 # print(x.available_area())
-# print(x._operator)
-# print(x.first_bin().coordinate(), x.last_bin().coordinate())
+# print(x.split_area())
+# print(x._polish_notation)
