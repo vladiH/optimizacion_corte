@@ -38,83 +38,98 @@ class GeneticAlgorithm:
             data.append([(utils.changeOrientation(bin[0]),bin[1]) if choices([0,1],[p, 1-p])[0]==0 else bin for bin in bin_list])
         return data
 
+    def generate_single_chromosome(self):
+        bin = [(utils.changeOrientation(bin[0]),bin[1]) if choices([0,1],[self.protacion, 1-self.protacion])[0]==0 else bin for bin in self.init_bin_list]
+        p, o = self.guillotine.cut(self.main_coordinates, bin)
+        return np.array([p,o])
 
-    def run(self, bin_list,bin_quantities, nbest, npoblacion, protacion):
+
+    def run(self, bin_list, nbest, npoblacion, protacion):
         '''
         bin_list: lista de materiales a cortar en formato [([x0,y0],'id'),....]
-        bin_quantities: cantidad de piezas por material a cortar [3,....]
         nbest: numero de individuos a seleccionar como mejores
         npoblacion: numero de individuos de una poblacion
         protacion: probabilidad de rotacion en la poblacion inicial
         '''
-        bin_list = self.preprocess_input(bin_list,bin_quantities)
-        # print(bin_list)
+        self.protacion = protacion
+        bin_list = self.preprocess_input(bin_list)
+        self.init_bin_list = bin_list
         self.data = self.pieces(bin_list)
         bin_list = self.poblacion_inicial(bin_list, protacion, npoblacion)
-        # print(bin_list)
-        # bin_list=[[([0, 0, 2, 6], '8'), ([0, 0, 2, 2], '4'), ([0, 0, 4, 2], '7'), ([0, 0, 4, 3], '3'), ([0, 0, 6, 1], '6'), ([0, 0, 4, 1], '1'), ([0, 0, 3, 2], '2'), ([0, 0, 2, 1], '5')]]
-        # print(self.main_coordinates)
         poblacion = []
-        horientation = []
+        orientation = []
         for entrada in bin_list:
             p,o  = self.guillotine.cut(self.main_coordinates,entrada)
             poblacion.append(p)
-            horientation.append(o)
-        poblacion = np.array(poblacion)
-        print(poblacion)
+            orientation.append(o)
         
-        fitness = []
-        while True:
-            f, index_mejor_individuo = self.seleccion(poblacion, nbest)
-            fitness.append((f[0],poblacion[index_mejor_individuo[0]]))
-            mejores_individuos = poblacion[index_mejor_individuo]
-            new = self.cruce(poblacion, len(poblacion)-len(mejores_individuos))
-            new.extend(mejores_individuos)
-            poblacion = np.array(new)
-            self.mutacion()
-            self.sustitucion()
-            print(f)
-            print(poblacion[index_mejor_individuo])
+        #[['polish expresion','orientation'],...[]]
+        poblacion = np.array(list(zip(poblacion,orientation)))
+        best_aptitude = []
+        i = 0
+        try:
+            while True:
+                scores, idxs = self.seleccion(poblacion, nbest)
+                best_aptitude.append((scores[0],poblacion[idxs[0]]))
+                if self.condicion_parada(i):
+                    break
+                best_chrom = poblacion[idxs]
+                new_generation = self.cruce(poblacion, len(poblacion)-len(best_chrom))
+                #self.mutacion()
+                new_generation = self.sustitucion(new_generation)
+                new_generation.extend(best_chrom)
+                poblacion = np.array(new_generation)
+                if i%100==0:
+                    print(10*'=', end='\n')
+                    print(best_chrom[0],' ', scores[0])
+                    i = 0
+                i += 1
+            return best_aptitude
+        except KeyboardInterrupt:
+            return best_aptitude
 
-    def preprocess_input(self,bin_list, bin_quantities):
+    def preprocess_input(self,bin_list):
         '''
-        Repite cada elemento de bin_list segun bin_quantities
             bin_list:[([x0,y0],'id'),....]
-            bin_quantities:[n,...]
             return:[([0,0,x0,y0],'id'),....]
         '''
-        bin_dims = [(utils.vectorToCoordinates(bin[0]),bin[1]) for bin in bin_list]
-        zip_bins = list(zip(bin_quantities,bin_dims))
-        bin_dims = []
-        for x in zip_bins:
-            bin_dims.extend(x[0]*[x[1]])
-        
+        bin_dims = [[utils.vectorToCoordinates(bin[0]),bin[1]] for bin in bin_list]
+        # zip_bins = list(zip(bin_quantities,bin_dims))
+        # bin_dims = []
+        # for x in zip_bins:
+        #     bin_dims.extend(x[0]*[x[1]])
         return bin_dims
 
-    def condicion_parada(self,cromosoma:str):
-        return False
+    def condicion_parada(self, fitness):
+        return fitness==2000
 
     def seleccion(self, poblacion, n):
         '''
-        n: numero de individuos a seleccionar
-        return: 
+        poblacion:[['polish expresion','orientation'],...[]]
+        n: numero de individuos a seleccionar como optimos
+        return: [bins_are/min_square,....], [best_fitness_index1,second_best_fitness_index,...]
         '''
-        s = np.array([self.fitness(cromosoma) for cromosoma in poblacion])
-        index = np.argsort(s)[:n]
-        return s[index], index
+        bins_over_min_square = np.array([self.fitness(cromosoma) for cromosoma in poblacion])
+        index = np.argsort(bins_over_min_square)[:n]
+        return bins_over_min_square[index], index
 
 
     def mutacion(self):
         pass
 
     def cruce(self, poblacion, n):
+        '''
+        poblacion:[['polish expresion','orientation'],...[]]
+        '''
+        p,h = list(zip(*poblacion))
+        index = np.arange(len(p))
         new = []
         while len(new)<n:
-            parents1 = np.random.choice(poblacion, size=int(np.ceil(n/2)), replace=False)
-            parents2 = np.random.choice(poblacion, size=int(np.ceil(n/2)), replace=False)
-            for parents in list(zip(parents1, parents2)):
-                p1 = np.array(parents[0].split(' '))
-                p2 = np.array(parents[1].split(' '))
+            index1 = np.random.choice(index, size=int(np.ceil(n/2)), replace=False)
+            index2 = np.random.choice(index, size=int(np.ceil(n/2)), replace=False)
+            for i1,i2 in zip(index1, index2):
+                p1 = np.array(p[i1].split(' '))
+                p2 = np.array(p[i2].split(' '))
                 #(index, value)
                 p1d = self.digit_index(p1)
                 #(index, value)
@@ -122,14 +137,14 @@ class GeneticAlgorithm:
                 min_size = min(len(p1d), len(p2d))
                 rand1 = np.random.randint(0,min_size)
                 rand2 = np.random.randint(rand1,min_size)
-                p1d,p2d = self.cross_gene(p1d, p2d, rand1,rand2)
+                p1d,p2d, ori1, ori2 = self.gene_cross(p1d, p2d, h[i1],h[i2], rand1,rand2)
                 # p1i,p1j = p1d[rand1][0], p1d[rand2][0]    
                 # p2i,p2j = p2d[rand1][0], p2d[rand2][0]
                 # print(p1d, p2d)
-                p1[list(p1d[0])]=list(p1d[1])
-                p2[list(p2d[0])]=list(p2d[1])
-                new.append(' '.join(p1))
-                new.append(' '.join(p2))
+                p1[p1d[0]]=p1d[1]
+                p2[p2d[0]]=p2d[1]
+                new.append(np.array([' '.join(p1), ori1]))
+                new.append(np.array([' '.join(p2), ori2]))
         return new
 
     def digit_index(self, array):
@@ -152,30 +167,56 @@ class GeneticAlgorithm:
                 operators.append((i,val))
         return operators
     
-    def cross_gene(self, array1,array2, min_index, max_index):
+    def gene_cross(self, array1,array2, orientation1, 
+                        orientation2, min_index, max_index):
         '''
-        array1: [(index, value),....]
-        array2: [(index, value),....]
+        array1: [(index, value),....], orientation1
+        array2: [(index, value),....], orientation2
         '''
-        array1 = list(zip(*array1))
-        array2 = list(zip(*array2))
+        idx1, val1 = map(list,zip(*array1))
+        idx2, val2 = map(list,zip(*array2))
+        orientation1 = [*orientation1]
+        orientation2 = [*orientation2]
         for i in range(min_index,max_index):
-            a = array1[1][i]
-            b = array2[1][i]
-            array2[1]= self.interchage(list(array2[1]),i,a)
-            array1[1]= self.interchage(list(array1[1]),i,b)
-        return (array1[0],array1[1]), (array2[0],array2[1])
+            gen1 = val1[i]
+            gen2 = val2[i]
+            gen1, gen2 = self.interchage(gen1, gen2)
+            ori1 = orientation1[i]
+            ori2 = orientation2[i]
+            orientation1[i],orientation2[i] = self.interchage(ori1,ori2)
+            val1, orientation1 = self.fix_gene_cross(val1,orientation1,i,gen1)
+            val2, orientation2 = self.fix_gene_cross(val2,orientation2,i,gen2)
+
+        return (idx1,val1), (idx2,val2), ''.join(orientation1), ''.join(orientation2)
             
 
-    def interchage(self,array,i, value):
-        r = self.find_index(array,value)
-        if r!=-1:
-            aux = array[i]
-            array[i]=array[r]
-            array[r] = aux
+    def interchage(self,a,b):
+        aux = a
+        a = b
+        b = aux
+        return a, b
+    
+    def fix_gene_cross(self, array1, array2, pos, gen):
+        '''
+        array1: digits chromosome,
+        array2; orientation of chromosomes
+        pos: position to fix
+        gen: gen to fix
+        '''
+        index = self.find_index(array1, gen)
+        if index==-1:
+            array1[pos] = gen
         else:
-            array[i] = value
-        return tuple(array)
+            aux = array1[pos]
+            array1[pos] = array1[index]
+            array1[index] = aux
+
+            aux = array2[pos]
+            array2[pos] = array2[index]
+            array2[index] = aux
+        
+        return array1, array2
+
         
     def find_index(self, array, value):
         try:
@@ -184,27 +225,20 @@ class GeneticAlgorithm:
             return -1
 
 
-    def sustitucion(self):
-        pass
+    def sustitucion(self, chromosomes):
+        width = self.main_coordinates[2]-self.main_coordinates[0]
+        height = self.main_coordinates[3] - self.main_coordinates[1]
+        for i, chromosome in enumerate(chromosomes):
+            min_space, bins_area =self.stack.evaluatePostfix(self.data,chromosome)
+            if min_space.width()>width or min_space.height()>height:
+                chromosomes[i]= self.generate_single_chromosome()
+        return chromosomes
+        
 
     def fitness(self, cromosoma:str):
-        # area = 0
-        # for gen in cromosoma.split(' '):
-        #     if gen.isdigit():
-        #         if gen in self.data:
-        #             area += self.area(*self.data[gen])
-        # return min(100000, self.main_area - area)
         self.stack.reset()
-        # area, width, height =self.stack.evaluatePostfix(self.data,cromosoma)
-        # if self.main_coordinates[2]-self.main_coordinates[0]<width or self.main_coordinates[3]-self.main_coordinates[1]<height:
-        #     return 10000
-        # else:
-        #     #print(area)
-
-        min_square, bins_area =self.stack.evaluatePostfix(self.data,cromosoma)
-        p = self.stack.binsPositions(self.data,cromosoma)
-        print(p)
-        return (1-bins_area/min_square)
+        min_space, bins_area =self.stack.evaluatePostfix(self.data,cromosoma)
+        return (1-bins_area/min_space.area())
 
 
     def area(self, x0,y0,x1,y1):
@@ -213,14 +247,14 @@ class GeneticAlgorithm:
 
 
 
-        
+# bin_dims = utils.generate_input(6,1,10)       
 
-#quantity for each bin defined in bin_dims
-bin_quantities = [1,1,1,1,1,1,1,1]
-#[width, height]
-bin_dims = [([4,1],'1'),([3,2],'2'),([4,3],'3'),([2,2],'4'),([2,1],'5'),([6,1],'6'),([4,2],'7'),([2,6],'8')]
-#material size
-area = [10,10]
+# #[width, height]
+# bin_dims = [([4,1],'1'),([3,2],'2'),([4,3],'3'),([2,2],'4'),([2,1],'5'),([6,1],'6'),([4,2],'7'),([2,6],'8')]
+# #material size
+# print(bin_dims)
+# area = [10,10]
 
-a = GeneticAlgorithm(bin_dims,area)
-a.run(bin_dims,bin_quantities,2,1,0.)
+# a = GeneticAlgorithm(bin_dims,area)
+# a.run(bin_dims,2,6,0.8)
+

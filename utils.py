@@ -1,3 +1,4 @@
+import random
 def vectorToCoordinates(vector):
     '''
     vector:[x,y]
@@ -33,6 +34,16 @@ def isIntersect(area1,area2):
     #print(x0,y0,x1,y1)
     area = max(0,x1-x0)*max(0,y0-y1)
     return area
+
+def generate_input(n, min_size, max_size):
+    result = []
+    for i in range(1,n+1):
+        x0 = random.randint(min_size,max_size)
+        y0 = random.randint(min_size,max_size)
+        result.append(([x0,y0],str(i)))
+    return result
+
+
 
 # print(is_contained([0,0,3,3],[0,0,2,2]))
 # print(is_intersect([0,0,2,2],[0,0,2,2]))

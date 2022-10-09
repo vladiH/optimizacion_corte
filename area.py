@@ -174,17 +174,28 @@ class Stack():
     # The main function that converts given infix expression
     # to postfix expression
     def evaluatePostfix(self, dictionary, exp):
+        '''
+        dictionary:{itemid:[coordinates]}
+        exp: ['polish expresion','orientation']
+        '''
         bins_area = 0
         width = 0
         height = 0
+        orientation = exp[1]
+        j = 0
         # Iterate over the expression for conversion
-        for i in exp.split(' '):
+        for i in exp[0].split(' '):
             # If the scanned character is an operand
             # (number here) push it to the stack
             if i.isdigit():
                 val = Bin(dictionary[i],i)
+                #print(val.coordinate())
+                if val.orientation() != orientation[j]:
+                    val.change_orientation()
                 self.push(val)
+                #print(val.coordinate())
                 bins_area+=val.area()
+                j +=1
             # If the scanned character is an operator,
             # pop two elements from stack and apply it.
             else:
@@ -199,40 +210,66 @@ class Stack():
                 else:
                     raise Exception('Invalid')
                 self.push(Bin([0,0,width,height],val1.id()+val2.id()+str(i)))
-        r = self.pop()
-        return r.area(), bins_area
+        min_space = self.pop()
+        return min_space, bins_area
 
-    def binsPositions(self, dictionary, exp):
+    def binsPositions(self, dictionary, exp, area):
+        '''
+        dictionary:{itemid:[coordinates]}
+        exp: ['polish expresion','orientation']
+        area: [x0,y0]
+        '''
         width = 0
         height = 0
         points = []
+        orientation = exp[1]
+        j = 0
         # Iterate over the expression for conversion
-        for i in exp.split(' '):
+        for i in exp[0].split(' '):
             # If the scanned character is an operand
             # (number here) push it to the stack
             if i.isdigit():
                 val = Bin(dictionary[i],i)
+                #print(val.coordinate())
+                if val.orientation() != orientation[j]:
+                    val.change_orientation()
                 self.push(val)
+                points.append(np.full((val.width(), val.height()), int(i)))
+                j +=1
  
             # If the scanned character is an operator,
             # pop two elements from stack and apply it.
             else:
                 val1 = self.pop()
                 val2 = self.pop()
+                sq1 = points.pop()
+                sq2 = points.pop()
                 if i =='H':
                     width = val1.width() + val2.width()
                     height = max(val1.height(),val2.height())
-                    
+                    s = np.zeros(shape=(width,height))
+                    c = val1.coordinate()
+                    c2 = val2.coordinate()
+                    s[c[0]:c[2],c[1]:c[3]] = sq1
+                    s[c2[0]+val1.width():c2[2]+val1.width(),c2[1]:c2[3]] = sq2
                 elif i == 'V':
                     width = max(val1.width(), val2.width())
                     height = val1.height()+val2.height()
+                    s = np.zeros(shape=(width,height))
+                    c = val1.coordinate()
+                    c2 = val2.coordinate()
+                    s[c[0]:c[2],c[1]:c[3]] = sq1
+                    s[c2[0]:c2[2],c2[1]+val1.height():c2[3]+val1.height()] = sq2
                 else:
                     raise Exception('Invalid')
                 id = val1.id()+val2.id()+str(i)
-                points.append(val1.coordinate())
                 self.push(Bin([0,0,width,height],id))
-        r = self.pop()
-        return points
+                points.append(s)
+        limit = self.pop().coordinate()
+        points = points.pop()
+        area = np.full((area[0], area[1]), 0)
+        area[limit[0]:limit[2],limit[1]:limit[3]] = points
+        return area[::-1,:]
 
 
 
@@ -248,3 +285,19 @@ class Stack():
 # print(x.available_area())
 # print(x.split_area())
 # print(x._polish_notation)
+# [([10, 9], '1'), ([4, 10], '2'),
+#  ([4, 3], '3'), ([6, 4], '4'),
+#   ([6, 8], '5'), ([9, 5], '6')]
+# dic = {
+#     '1': [0,0,10,9],
+#     '2': [0,0, 4,10],
+#     '3': [0,0,4,3],
+#     '4': [0,0,6,4],
+#     '5': [0,0,6,8],
+#     '6': [0,0,9,5],
+#     }
+
+# exp = ('4 3 H 1 5 V V 6 2 V H', 'HVVHVV')
+
+# b = Stack()
+# print(b.binsPositions(dic,exp,[20,20]))
