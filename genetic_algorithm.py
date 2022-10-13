@@ -44,12 +44,13 @@ class GeneticAlgorithm:
         return np.array([p,o])
 
 
-    def run(self, bin_list, nbest, npoblacion, protacion):
+    def run(self, bin_list, nbest, npoblacion, protacion, pmutacion):
         '''
         bin_list: lista de materiales a cortar en formato [([x0,y0],'id'),....]
         nbest: numero de individuos a seleccionar como mejores
         npoblacion: numero de individuos de una poblacion
         protacion: probabilidad de rotacion en la poblacion inicial
+        pmutacion: probabilidad de realizar una mutacion
         '''
         self.protacion = protacion
         bin_list = self.preprocess_input(bin_list)
@@ -75,7 +76,7 @@ class GeneticAlgorithm:
                     break
                 best_chrom = poblacion[idxs]
                 new_generation = self.cruce(poblacion, len(poblacion)-len(best_chrom))
-                #self.mutacion()
+                new_generation = self.mutacion(new_generation, pmutacion)
                 new_generation = self.sustitucion(new_generation)
                 new_generation.extend(best_chrom)
                 poblacion = np.array(new_generation)
@@ -114,12 +115,32 @@ class GeneticAlgorithm:
         return bins_over_min_square[index], index
 
 
-    def mutacion(self):
-        pass
+    def mutacion(self, individuos, pmutacion):
+        '''
+        individuos:[['polish expresion','orientation'],...[]]
+        pmutacion: probabilidad de realizar una mutacion
+        '''
+        for i,individuo in enumerate(individuos):
+            number = np.random.choice(2, 1, p=[1-pmutacion,pmutacion])
+            if number == 0:
+                continue
+            polish,orien = individuo
+            polish = polish.split(' ')
+            char_index = self.char_index(polish)
+            index_array = np.arange(1, len(char_index)+1)
+            index = choices(index_array, weights=index_array[::-1], k=1)[0]
+            index -= 1 
+            if char_index[index][1]=='H':
+                polish[char_index[index][0]] = 'V'
+            else:
+                polish[char_index[index][0]] = 'H'
+            individuos[i] = np.array([' '.join(polish), orien])
+        return individuos
 
     def cruce(self, poblacion, n):
         '''
         poblacion:[['polish expresion','orientation'],...[]]
+        n: numero de cromosomas a generar despues de realizar el cruce
         '''
         p,h = list(zip(*poblacion))
         index = np.arange(len(p))
@@ -135,8 +156,11 @@ class GeneticAlgorithm:
                 #(index, value)
                 p2d = self.digit_index(p2)
                 min_size = min(len(p1d), len(p2d))
-                rand1 = np.random.randint(0,min_size)
-                rand2 = np.random.randint(rand1,min_size)
+                # rand1 = np.random.randint(0,min_size)
+                # rand2 = np.random.randint(rand1,min_size)
+                rands = np.random.choice(min_size, 2, replace=False)
+                np.sort(rands, axis=None)
+                rand1,rand2 = rands
                 p1d,p2d, ori1, ori2 = self.gene_cross(p1d, p2d, h[i1],h[i2], rand1,rand2)
                 # p1i,p1j = p1d[rand1][0], p1d[rand2][0]    
                 # p2i,p2j = p2d[rand1][0], p2d[rand2][0]
@@ -156,6 +180,16 @@ class GeneticAlgorithm:
             if val.isdigit():
                 digits.append((i,val))
         return digits
+    
+    def char_index(self, array):
+        '''
+        return: [(index, value),...]
+        '''
+        chars = []
+        for i,val in enumerate(array):
+            if not val.isdigit():
+                chars.append((i,val))
+        return chars
     
     def operator_index(self, array):
         '''
@@ -256,5 +290,5 @@ class GeneticAlgorithm:
 # area = [10,10]
 
 # a = GeneticAlgorithm(bin_dims,area)
-# a.run(bin_dims,2,6,0.8)
+# a.run(bin_dims,2,6,0.8, 0.9)
 
