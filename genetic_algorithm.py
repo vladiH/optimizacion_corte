@@ -70,12 +70,12 @@ class GeneticAlgorithm:
         i = 0
         try:
             while True:
-                scores, idxs = self.seleccion(poblacion, nbest)
-                best_aptitude.append((scores[0],poblacion[idxs[0]]))
+                scores, best_idxs, idxs = self.seleccion(poblacion, nbest)
+                best_aptitude.append((scores[0],poblacion[best_idxs][0]))
                 if self.condicion_parada(i):
                     break
-                best_chrom = poblacion[idxs]
-                new_generation = self.cruce(poblacion, len(poblacion)-len(best_chrom))
+                best_chrom = poblacion[best_idxs]
+                new_generation = self.cruce(poblacion[idxs], len(poblacion)-len(best_chrom))
                 new_generation = self.mutacion(new_generation, pmutacion)
                 new_generation = self.sustitucion(new_generation)
                 new_generation.extend(best_chrom)
@@ -95,10 +95,6 @@ class GeneticAlgorithm:
             return:[([0,0,x0,y0],'id'),....]
         '''
         bin_dims = [[utils.vectorToCoordinates(bin[0]),bin[1]] for bin in bin_list]
-        # zip_bins = list(zip(bin_quantities,bin_dims))
-        # bin_dims = []
-        # for x in zip_bins:
-        #     bin_dims.extend(x[0]*[x[1]])
         return bin_dims
 
     def condicion_parada(self, fitness):
@@ -108,11 +104,11 @@ class GeneticAlgorithm:
         '''
         poblacion:[['polish expresion','orientation'],...[]]
         n: numero de individuos a seleccionar como optimos
-        return: [bins_are/min_square,....], [best_fitness_index1,second_best_fitness_index,...]
+        return: [bins_are/min_square,....], [best_fitness_index1,second_best_fitness_index,...], [full index sorted ascendant]
         '''
         bins_over_min_square = np.array([self.fitness(cromosoma) for cromosoma in poblacion])
-        index = np.argsort(bins_over_min_square)[:n]
-        return bins_over_min_square[index], index
+        index = np.argsort(bins_over_min_square)
+        return bins_over_min_square[index[:n]], index[:n], index
 
 
     def mutacion(self, individuos, pmutacion):
@@ -128,12 +124,9 @@ class GeneticAlgorithm:
             polish = polish.split(' ')
             char_index = self.char_index(polish)
             index_array = np.arange(1, len(char_index)+1)
-            index = choices(index_array, weights=index_array[::-1], k=1)[0]
-            index -= 1 
-            if char_index[index][1]=='H':
-                polish[char_index[index][0]] = 'V'
-            else:
-                polish[char_index[index][0]] = 'H'
+            index1, index2 = choices(index_array, k=2, weights=index_array[::-1])
+            polish[char_index[index1-1][0]] = char_index[index2-1][1]
+            polish[char_index[index2-1][0]] = char_index[index1-1][1]
             individuos[i] = np.array([' '.join(polish), orien])
         return individuos
 
@@ -144,10 +137,12 @@ class GeneticAlgorithm:
         '''
         p,h = list(zip(*poblacion))
         index = np.arange(len(p))
+        wheel = 1/(index+1)
+        wheel = wheel/np.sum(wheel)
         new = []
         while len(new)<n:
-            index1 = np.random.choice(index, size=int(np.ceil(n/2)), replace=False)
-            index2 = np.random.choice(index, size=int(np.ceil(n/2)), replace=False)
+            index1 = np.random.choice(index, size=int(np.ceil(n/2)), replace=True, p=wheel)
+            index2 = np.random.choice(index, size=int(np.ceil(n/2)), replace=False, p=wheel)
             for i1,i2 in zip(index1, index2):
                 p1 = np.array(p[i1].split(' '))
                 p2 = np.array(p[i2].split(' '))
@@ -156,15 +151,10 @@ class GeneticAlgorithm:
                 #(index, value)
                 p2d = self.digit_index(p2)
                 min_size = min(len(p1d), len(p2d))
-                # rand1 = np.random.randint(0,min_size)
-                # rand2 = np.random.randint(rand1,min_size)
                 rands = np.random.choice(min_size, 2, replace=False)
                 np.sort(rands, axis=None)
                 rand1,rand2 = rands
                 p1d,p2d, ori1, ori2 = self.gene_cross(p1d, p2d, h[i1],h[i2], rand1,rand2)
-                # p1i,p1j = p1d[rand1][0], p1d[rand2][0]    
-                # p2i,p2j = p2d[rand1][0], p2d[rand2][0]
-                # print(p1d, p2d)
                 p1[p1d[0]]=p1d[1]
                 p2[p2d[0]]=p2d[1]
                 new.append(np.array([' '.join(p1), ori1]))
@@ -263,6 +253,7 @@ class GeneticAlgorithm:
         width = self.main_coordinates[2]-self.main_coordinates[0]
         height = self.main_coordinates[3] - self.main_coordinates[1]
         for i, chromosome in enumerate(chromosomes):
+            self.stack.reset()
             min_space, bins_area =self.stack.evaluatePostfix(self.data,chromosome)
             if min_space.width()>width or min_space.height()>height:
                 chromosomes[i]= self.generate_single_chromosome()
@@ -272,7 +263,7 @@ class GeneticAlgorithm:
     def fitness(self, cromosoma:str):
         self.stack.reset()
         min_space, bins_area =self.stack.evaluatePostfix(self.data,cromosoma)
-        return (1-bins_area/min_space.area())
+        return 1-bins_area/min_space.area()
 
 
     def area(self, x0,y0,x1,y1):
