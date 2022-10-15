@@ -57,7 +57,7 @@ class EnfriamientoSimulado:
                     print(s_actual,' ', aptitud_actual)
             return best_aptitude, s_mejor, aptitud_mejor
         except KeyboardInterrupt:
-            return best_aptitude
+            return best_aptitude, s_mejor, aptitud_mejor
 
     def scouting(self, bin_list, p, n):
         '''
@@ -251,14 +251,6 @@ class EnfriamientoSimulado:
             if not val.isdigit():
                 operators.append([i,val])
         return operators
-
-    def evaluarSolucion(self, dif, t):
-        '''
-        dif: diferencia entre soluciones de dos individuos
-        t: temperatura
-        '''
-
-        pass
 
     def probabilidad(self, diff, t):
         return np.exp(diff/t)

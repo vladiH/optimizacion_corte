@@ -238,7 +238,6 @@ class GeneticAlgorithm:
             aux = array2[pos]
             array2[pos] = array2[index]
             array2[index] = aux
-        
         return array1, array2
 
         
