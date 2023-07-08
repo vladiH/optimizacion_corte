@@ -1,11 +1,17 @@
 import numpy as np
 import utils
+import time
 from guillotine_algorithm import GuillotineAlgorithm
 from area import Stack
 from random import choices, random, shuffle
 
 class AlgoritmoGenetico:
-    def __init__(self,vector, pcross=0.5, prorientation=0.3, pcoperator=0.3, pcnoperator=0.1, pexchanging=0.3):
+    def __init__(self,vector, 
+                    pcross=0.5, 
+                    prorientation=0.3,
+                    pcoperator=0.3,
+                    pcnoperator=0.1,
+                    pexchanging=0.3):
         '''
         vector = [x0,y0]
         prorientation: probability to rotate orientation
@@ -23,7 +29,36 @@ class AlgoritmoGenetico:
 
         self.stack = Stack()
         self.guillotine = GuillotineAlgorithm()
-    
+
+    def run(self, bin_list, nbest, npoblacion, protacion, stop):
+        '''
+        bin_list: lista de materiales a cortar en formato [([x0,y0],'id'),....]
+        nbest: numero de individuos a seleccionar como mejores
+        npoblacion: numero de individuos por generacion
+        protacion: probabilidad de rotacion en la generacion de cromosomas
+         stop: indica el numero de iteracion a detenerse
+        '''
+        start_time = time.time()
+        best_aptitude = []
+        chromosomes = self.firstGeneration(bin_list, protacion, npoblacion)
+        i = 0
+        try:
+            while i<stop:
+                best_chrom, best_chrom_aptitude, chromosomes, aptitudes = self.selection(chromosomes, nbest)
+                best_aptitude.append((best_chrom[0], best_chrom_aptitude[0]*100, time.time()-start_time))
+                new_generation = self.crossing(chromosomes, aptitudes, len(chromosomes)-nbest)
+                new_generation = self.mutation(new_generation)
+                new_generation = self.substitution(new_generation, protacion)
+                new_generation.extend(best_chrom)
+                chromosomes = np.array(new_generation)
+                i += 1
+                if i%100==0:
+                    print(10*'=', end='\n')
+                    print(best_chrom[0],' ', best_chrom_aptitude[0])
+            return best_aptitude
+        except KeyboardInterrupt:
+            return best_aptitude
+
     def firstGeneration(self, bin_list, p, n):
         bin_list = self.preprocessInput(bin_list)
         self.initial_bins = bin_list
@@ -290,34 +325,6 @@ class AlgoritmoGenetico:
                 chromosomes[i]= self.generateSingleChromosome(protacion)
         return chromosomes
 
-    def run(self, bin_list, nbest, npoblacion, protacion, stop):
-        '''
-        bin_list: lista de materiales a cortar en formato [([x0,y0],'id'),....]
-        nbest: numero de individuos a seleccionar como mejores
-        npoblacion: numero de individuos por generacion
-        protacion: probabilidad de rotacion en la generacion de cromosomas
-         stop: indica el numero de iteracion donde detenerse
-        '''
-        best_aptitude = []
-        chromosomes = self.firstGeneration(bin_list, protacion, npoblacion)
-        i = 0
-        try:
-            while i<stop:
-                best_chrom, best_chrom_aptitude, chromosomes, aptitudes = self.selection(chromosomes, nbest)
-                best_aptitude.append((best_chrom[0],best_chrom_aptitude[0]))
-                new_generation = self.crossing(chromosomes, aptitudes, len(chromosomes)-nbest)
-                new_generation = self.mutation(new_generation)
-                new_generation = self.substitution(new_generation, protacion)
-                new_generation.extend(best_chrom)
-                chromosomes = np.array(new_generation)
-                i += 1
-                if i%100==0:
-                    print(10*'=', end='\n')
-                    print(best_chrom[0],' ', best_chrom_aptitude[0])
-            return best_aptitude
-        except KeyboardInterrupt:
-            return best_aptitude
-
 
 # bin_dims = [([4,1],'1'),([3,2],'2'),([4,3],'3'),([2,2],'4'),([2,1],'5'),([6,1],'6'),([4,2],'7'),([2,6],'8')]
 # #material size
@@ -325,4 +332,4 @@ class AlgoritmoGenetico:
 # area = [10,10]
 
 # a = AlgoritmoGenetico(area)
-# a.run(bin_dims,2,20,0.8, 4000)
+# a.run(bin_dims,2,20,0.8, 200)

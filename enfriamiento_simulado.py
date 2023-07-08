@@ -1,11 +1,16 @@
 import numpy as np
 import utils
+import time
 from guillotine_algorithm import GuillotineAlgorithm
 from area import Stack
 from random import choices, shuffle
 
 class EnfriamientoSimulado:
-    def __init__(self,vector, prorientation=0.3, pcoperator=0.3, pcnoperator=0.1, pexchanging=0.3):
+    def __init__(self,vector, 
+                prorientation=0.3, 
+                pcoperator=0.3, 
+                pcnoperator=0.1,
+                pexchanging=0.3):
         '''
         vector = [x0,y0]
         prorientation: probability to rotate orientation
@@ -22,13 +27,14 @@ class EnfriamientoSimulado:
         self.stack = Stack()
         self.guillotine = GuillotineAlgorithm()
 
-    def run(self, bin_list, p, n, stop, t=20000):
+    def run(self, bin_list, p, n, stop, k=0.01, t=20000):
         '''
         t: temperatura inicial
-        p: probabilidad de rotar en la explotacion inicial
-        n: numero de indivudos en la explotacion inicial
+        p: probabilidad de rotar en la exploracion inicial
+        n: numero de indivudos en la exploracion inicial
         stop: stop number, iteration to do for getting result
         '''
+        start_time = time.time()
         best_aptitude = []
         #s_actual:[polish expression, orientation]
         s_actual, aptitud_actual = self.initialChromosome(bin_list, p, n)
@@ -37,7 +43,7 @@ class EnfriamientoSimulado:
         i = 0
         try:
             while i<stop:
-                best_aptitude.append(s_actual)
+                best_aptitude.append((s_actual, aptitud_actual*100, time.time()-start_time))
                 s_nuevo, aptitud_nuevo = self.newNeighbors(s_actual)
                 diff = aptitud_nuevo - aptitud_actual
                 if diff < 0:
@@ -51,13 +57,13 @@ class EnfriamientoSimulado:
                         s_actual = s_nuevo
                         aptitud_actual = aptitud_nuevo
                 i +=1
-                t = self.actualizarTemperatura(t, 0.01)
+                t = self.actualizarTemperatura(t, k)
                 if i%100==0:
                     print(20*'=', end='\n')
                     print(s_actual,' ', aptitud_actual)
-            return best_aptitude, s_mejor, aptitud_mejor
+            return best_aptitude, s_mejor, aptitud_mejor*100
         except KeyboardInterrupt:
-            return best_aptitude, s_mejor, aptitud_mejor
+            return best_aptitude, s_mejor, aptitud_mejor*100
 
     def scouting(self, bin_list, p, n):
         '''
